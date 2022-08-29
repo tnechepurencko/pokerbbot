@@ -24,15 +24,44 @@ GAMES = dict()
 
 
 class Form(StatesGroup):
-    name = State()
-    age = State()
-    gender = State()
+    name_c = State()
+    name_l = State()
+    new_game = State()
 
 
-@dp.message_handler(commands=['start'])
+@dp.message_handler(commands='start')
 async def cmd_start(message: types.Message):
-    await Form.name.set()
+    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    buttons = ['New game', 'Log in to game']
+    keyboard.add(*buttons)
+    await message.answer('Choose an option', reply_markup=keyboard)
+
+
+@dp.message_handler(lambda message: message.text == 'New game')
+async def cmd_start(message: types.Message):
+    await Form.name_c.set()
     await message.reply("Enter the name of the game or /cancel")
+
+
+@dp.message_handler(lambda message: message.text == 'Log in to game')
+async def cmd_start(message: types.Message):
+    await Form.name_l.set()
+    await message.reply("Enter the name of the game or /cancel")
+
+
+@dp.message_handler(state=Form.name_l)
+async def process_name(message: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        data['name'] = message.text
+
+    await state.finish()
+
+    if message.from_id not in GAMES.keys() or data['name'] not in GAMES[message.from_id]:
+        await message.reply(f'The game \"{message.text}\" does not exist')
+        return
+
+    await message.reply(f'The game \"{message.text}\" is opened')
+
 
 
 @dp.message_handler(state='*', commands='cancel')
@@ -46,7 +75,7 @@ async def cancel_handler(message: types.Message, state: FSMContext):
     await message.reply('ОК')
 
 
-@dp.message_handler(state=Form.name)
+@dp.message_handler(state=Form.name_c)
 async def process_name(message: types.Message, state: FSMContext):
     async with state.proxy() as data:
         data['name'] = message.text
@@ -58,13 +87,7 @@ async def process_name(message: types.Message, state: FSMContext):
     await message.reply(f'The game \"{GAMES[message.from_id][-1]}\" is created')
     await state.finish()
 
-#
-# @dp.message_handler(commands='start')
-# async def cmd_start(message: types.Message):
-#     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
-#     buttons = ['New game', 'Log in to game']
-#     keyboard.add(*buttons)
-#     await message.answer('Choose an option', reply_markup=keyboard)
+
 #
 #
 # @dp.message_handler(lambda message: message.text == 'New game')
@@ -112,49 +135,6 @@ async def process_name(message: types.Message, state: FSMContext):
 #     return True
 #
 #
-
-
-
-
-
-# @dp.message_handler(lambda message: message.text.isdigit(), state=Form.age)
-# async def process_age(message: types.Message, state: FSMContext):
-#     await Form.next()
-#     await state.update_data(age=int(message.text))
-#
-#     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, selective=True)
-#     markup.add("М", "Ж")
-#     markup.add("Другое")
-#
-#     await message.reply("Укажи пол (кнопкой)", reply_markup=markup)
-#
-#
-# # Проверяем пол
-# @dp.message_handler(lambda message: message.text not in ["М", "Ж", "Другое"], state=Form.gender)
-# async def process_gender_invalid(message: types.Message):
-#     return await message.reply("Не знаю такой пол. Укажи пол кнопкой на клавиатуре")
-#
-#
-# # Сохраняем пол, выводим анкету
-# @dp.message_handler(state=Form.gender)
-# async def process_gender(message: types.Message, state: FSMContext):
-#     async with state.proxy() as data:
-#         data['gender'] = message.text
-#         markup = types.ReplyKeyboardRemove()
-#
-#         await bot.send_message(
-#             message.chat.id,
-#             md.text(
-#                 md.text('Hi! Nice to meet you,', md.bold(data['name'])),
-#                 md.text('Age:', md.code(data['age'])),
-#                 md.text('Gender:', data['gender']),
-#                 sep='\n',
-#             ),
-#             reply_markup=markup,
-#             parse_mode=ParseMode.MARKDOWN,
-#         )
-#
-#     await state.finish()
 
 
 if __name__ == '__main__':
