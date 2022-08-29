@@ -21,12 +21,19 @@ dp = Dispatcher(bot, storage=storage)
 logging.basicConfig(level=logging.INFO)
 
 GAMES = dict()
+IN_GAME = tuple()
+
+
+def set_in_game(uid, game_name):
+    global IN_GAME
+    IN_GAME = (uid, game_name)
 
 
 class Form(StatesGroup):
     name_c = State()
     name_l = State()
     new_game = State()
+    in_game = State()
 
 
 @dp.message_handler(commands='start')
@@ -40,13 +47,13 @@ async def cmd_start(message: types.Message):
 @dp.message_handler(lambda message: message.text == 'New game')
 async def cmd_start(message: types.Message):
     await Form.name_c.set()
-    await message.reply("Enter the name of the game or /cancel")
+    await message.answer("Enter the name of the game or /cancel")
 
 
 @dp.message_handler(lambda message: message.text == 'Log in to game')
 async def cmd_start(message: types.Message):
     await Form.name_l.set()
-    await message.reply("Enter the name of the game or /cancel")
+    await message.answer("Enter the name of the game or /cancel")
 
 
 @dp.message_handler(state=Form.name_l)
@@ -57,10 +64,25 @@ async def process_name(message: types.Message, state: FSMContext):
     await state.finish()
 
     if message.from_id not in GAMES.keys() or data['name'] not in GAMES[message.from_id]:
-        await message.reply(f'The game \"{message.text}\" does not exist')
+        await message.answer(f'The game \"{message.text}\" does not exist')
         return
 
-    await message.reply(f'The game \"{message.text}\" is opened')
+    set_in_game(message.from_id, message.text)
+    await Form.in_game.set()
+
+    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    buttons = ['Add players', 'Log out']
+    keyboard.add(*buttons)
+
+    await message.answer(f'The game \"{message.text}\" is opened', reply_markup=keyboard)
+
+
+# @dp.message_handler(state=Form.in_game)
+# async def cmd_start(message: types.Message):
+#     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
+#     buttons = ['Add players', 'Log out']
+#     keyboard.add(*buttons)
+#     await message.answer('Choose an option', reply_markup=keyboard)
 
 
 
@@ -72,7 +94,7 @@ async def cancel_handler(message: types.Message, state: FSMContext):
         return
 
     await state.finish()
-    await message.reply('ОК')
+    await message.answer('ОК')
 
 
 @dp.message_handler(state=Form.name_c)
@@ -84,7 +106,7 @@ async def process_name(message: types.Message, state: FSMContext):
         GAMES[message.from_id] = []
     GAMES[message.from_id].append(data['name'])
 
-    await message.reply(f'The game \"{GAMES[message.from_id][-1]}\" is created')
+    await message.answer(f'The game \"{GAMES[message.from_id][-1]}\" is created')
     await state.finish()
 
 
