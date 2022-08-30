@@ -1,13 +1,11 @@
 import logging
 from os import getenv
 from sys import exit
-import aiogram.utils.markdown as md
 from aiogram import Bot, Dispatcher, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Text
 from aiogram.dispatcher.filters.state import State, StatesGroup
-from aiogram.types import ParseMode
 from aiogram.utils import executor
 
 bot_token = getenv("BOT_TOKEN")
@@ -29,11 +27,16 @@ def set_in_game(uid, game_name):
     IN_GAME = (uid, game_name)
 
 
+def reset_in_game():
+    global IN_GAME
+    IN_GAME = tuple()
+
+
 class Form(StatesGroup):
     name_c = State()
     name_l = State()
+    name_p = State()
     new_game = State()
-    in_game = State()
 
 
 @dp.message_handler(commands='start')
@@ -56,34 +59,62 @@ async def cmd_start(message: types.Message):
     await message.answer("Enter the name of the game or /cancel")
 
 
-@dp.message_handler(state=Form.name_l)
+@dp.message_handler(state=Form.name_c)
 async def process_name(message: types.Message, state: FSMContext):
-    async with state.proxy() as data:
-        data['name'] = message.text
-
     await state.finish()
 
-    if message.from_id not in GAMES.keys() or data['name'] not in GAMES[message.from_id]:
+    if message.from_id not in GAMES.keys():
+        GAMES[message.from_id] = dict()
+    elif message.text in GAMES[message.from_id].keys():
+        await message.answer(f'The game \"{message.text}\" already exists')
+        return
+
+    GAMES[message.from_id][message.text] = []
+    await message.answer(f'The game \"{message.text}\" is created')
+
+
+@dp.message_handler(state=Form.name_l)
+async def process_name(message: types.Message, state: FSMContext):
+    await state.finish()
+
+    if message.from_id not in GAMES.keys() or message.text not in GAMES[message.from_id]:
         await message.answer(f'The game \"{message.text}\" does not exist')
         return
 
     set_in_game(message.from_id, message.text)
-    await Form.in_game.set()
 
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    buttons = ['Add players', 'Log out']
+    buttons = ['Add player', 'Log out']
     keyboard.add(*buttons)
 
     await message.answer(f'The game \"{message.text}\" is opened', reply_markup=keyboard)
 
 
-# @dp.message_handler(state=Form.in_game)
-# async def cmd_start(message: types.Message):
-#     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
-#     buttons = ['Add players', 'Log out']
-#     keyboard.add(*buttons)
-#     await message.answer('Choose an option', reply_markup=keyboard)
+@dp.message_handler(lambda message: message.text == 'Log out')
+async def cmd_start(message: types.Message):
+    reset_in_game()
+    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    buttons = ['New game', 'Log in to game']
+    keyboard.add(*buttons)
+    await message.answer("Back to the menu", reply_markup=keyboard)
 
+
+@dp.message_handler(lambda message: message.text == 'Add player')
+async def cmd_start(message: types.Message):
+    await Form.name_p.set()
+    await message.answer("Enter the name of the player or /cancel")
+
+
+@dp.message_handler(state=Form.name_p)
+async def process_name(message: types.Message, state: FSMContext):
+    await state.finish()
+
+    if message.text in GAMES[IN_GAME[0]][IN_GAME[1]]:
+        await message.answer(f'The player \"{message.text}\" already exists')
+        return
+
+    GAMES[IN_GAME[0]][IN_GAME[1]].append(message.text)
+    await message.answer(f'The player \"{message.text}\" is added')
 
 
 @dp.message_handler(state='*', commands='cancel')
@@ -95,19 +126,6 @@ async def cancel_handler(message: types.Message, state: FSMContext):
 
     await state.finish()
     await message.answer('ОК')
-
-
-@dp.message_handler(state=Form.name_c)
-async def process_name(message: types.Message, state: FSMContext):
-    async with state.proxy() as data:
-        data['name'] = message.text
-
-    if message.from_id not in GAMES.keys():
-        GAMES[message.from_id] = []
-    GAMES[message.from_id].append(data['name'])
-
-    await message.answer(f'The game \"{GAMES[message.from_id][-1]}\" is created')
-    await state.finish()
 
 
 #
@@ -145,11 +163,7 @@ async def process_name(message: types.Message, state: FSMContext):
 # @dp.message_handler(commands="dice")
 # async def cmd_dice(message: types.Message):
 #     await message.answer_dice(emoji="🎲")
-#
-#
-# if __name__ == "__main__":
-#     executor.start_polling(dp, skip_updates=True)
-#
+
 #
 # @dp.errors_handler(exception=BotBlocked)
 # async def error_bot_blocked(update: types.Update, exception: BotBlocked):
