@@ -79,7 +79,7 @@ async def process_name(message: types.Message, state: FSMContext):
         await message.answer(f'The game \"{message.text}\" already exists')
         return
 
-    GAMES[message.from_id][message.text] = []
+    GAMES[message.from_id][message.text] = dict()
     await message.answer(f'The game \"{message.text}\" is created')
 
 
@@ -94,17 +94,27 @@ async def process_name(message: types.Message, state: FSMContext):
     set_in_game(message.from_id, message.text)
 
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    buttons = ['Add player', 'Log out']
+    buttons = ['Add player', 'Log out', 'Show players']
     keyboard.add(*buttons)
 
     await message.answer(f'The game \"{message.text}\" is opened', reply_markup=keyboard)
+
+
+@dp.message_handler(lambda message: message.text == 'Show players')
+async def cmd_start(message: types.Message):
+    await message.answer("Players:")
+    players = ""
+    for key in GAMES[IN_GAME[0]][IN_GAME[1]].keys():
+        players = players + 'name: ' + key + '     bank: ' + str(GAMES[IN_GAME[0]][IN_GAME[1]][key]) + '\n'
+
+    await message.answer(f"{players}")
 
 
 @dp.message_handler(lambda message: message.text == 'Log out')
 async def cmd_start(message: types.Message):
     reset_in_game()
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    buttons = ['New game', 'Log in to game']
+    buttons = ['New game', 'Log in to game', 'Show the games']
     keyboard.add(*buttons)
     await message.answer("Back to the menu", reply_markup=keyboard)
 
@@ -119,11 +129,11 @@ async def cmd_start(message: types.Message):
 async def process_name(message: types.Message, state: FSMContext):
     await state.finish()
 
-    if message.text in GAMES[IN_GAME[0]][IN_GAME[1]]:
+    if message.text in GAMES[IN_GAME[0]][IN_GAME[1]].keys():
         await message.answer(f'The player \"{message.text}\" already exists')
         return
 
-    GAMES[IN_GAME[0]][IN_GAME[1]].append(message.text)
+    GAMES[IN_GAME[0]][IN_GAME[1]][message.text] = 0
     await message.answer(f'The player \"{message.text}\" is added')
 
 
