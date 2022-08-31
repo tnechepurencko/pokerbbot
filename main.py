@@ -42,9 +42,19 @@ class Form(StatesGroup):
 @dp.message_handler(commands='start')
 async def cmd_start(message: types.Message):
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    buttons = ['New game', 'Log in to game']
+    buttons = ['New game', 'Log in to game', 'Show the games']
     keyboard.add(*buttons)
     await message.answer('Choose an option', reply_markup=keyboard)
+
+
+@dp.message_handler(lambda message: message.text == 'Show the games')
+async def cmd_start(message: types.Message):
+    await message.answer("Your games:")
+    games = ""
+    for key in GAMES[message.from_id].keys():
+        games = games + '\"' + key + '\", '
+
+    await message.answer(f"{games[:-2]}")
 
 
 @dp.message_handler(lambda message: message.text == 'New game')
